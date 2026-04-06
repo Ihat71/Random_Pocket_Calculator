@@ -3,10 +3,20 @@ import tkinter as tk
 from tkinter import ttk
 import queue
 from re import *
-from sympy import *
+import sys
+
+from sympy import symbols
+from sympy.parsing.sympy_parser import (
+    parse_expr,
+    standard_transformations,
+    implicit_multiplication_application
+)
+
+# print(sys.executable)
+
 import numpy as np
 import matplotlib.pyplot as plt
-import sqlite3 as sq
+# import sqlite3 as sq
 from pathlib import Path
 
 db_path = (Path(__file__).parent) / "equation_history.db"
@@ -60,11 +70,15 @@ class MainPage(ttk.Frame):
         button_2.grid(column=2,row=1,sticky='nsew')
         button_3 = ttk.Button(self, text="Go to Graph Calc page", command=lambda: controller.show_frame(GraphingCalc))
         button_3.grid(column=3,row=1,sticky='nsew')
+
+
 class RandEqPage(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         #create a queue
-        self.q = queue.Queue()
+        # self.q = queue.Queue()
+        self.correct_ans = ''
+        self.math_text = ''
         random_number = 0
         #entry validation
         def only_numbers(text):
@@ -76,14 +90,14 @@ class RandEqPage(ttk.Frame):
         def check(event):
             correct = event
             txt = self.entry_math.get()
+            self.correct_or_not.grid(row=4, column=1, sticky="nsew")
+
             if int(txt) == int(correct):
                 self.correct_or_not.config(text="Correct, congrats!")
                 self.next_eq.grid(row=5, column=1)
-                self.give_up.grid_forget()
 
             else:
                 self.correct_or_not.config(text="You Are Wrong, Try Again")
-                self.give_up.grid(row=6, column=1)
                 self.next_eq.grid_forget()
                 
         def num_getter():
@@ -102,40 +116,51 @@ class RandEqPage(ttk.Frame):
         
         #needs work
         def go_next():
+
             self.label_entry.grid(row=1, column=0, sticky="nsew")
             self.entry.grid(column=0, row=2, sticky="nsew")
-            self.entry_button.grid(row=3, column=0, sticky="nsew")
+            # self.entry_button.grid(row=3, column=0, sticky="nsew")
             self.start_button.grid(row=4, column=0, sticky="nsew")
             self.label_entry.config(text="1st range")
             forget_eq_buttons()
+
+        def next_eq():
+            self.correct_ans, self.math_text = num_getter()
+            self.label_math.config(text=self.math_text)
+            self.next_eq.grid_forget()
+            self.correct_or_not.grid_forget()
+
 
         
         def start_math():
             label_start = ttk.Label(self, text="Equations", font=("Arial", 14))
             label_start.grid(row=0, column=1, sticky="nsew")
-            correct_ans, math_text = num_getter()
+            self.correct_ans, self.math_text = num_getter()
 
-            self.label_math = ttk.Label(self, text=math_text, font=("Arial", 12))
+            self.label_math = ttk.Label(self, text=self.math_text, font=("Arial", 12))
             self.label_math.grid(row=1, column=1, sticky="nsew")
 
             self.entry_math = ttk.Entry(self)
             self.entry_math.grid(row=2, column=1, sticky="nsew")
 
-            self.button_math = ttk.Button(self, text="Lock In", command=lambda: check(correct_ans))
+            self.button_math = ttk.Button(self, text="Lock In", command=lambda: check(self.correct_ans))
             self.button_math.grid(row=3, column=1, sticky="nsew")
 
             self.correct_or_not = ttk.Label(self, text="", font=("Arial", 10))
-            self.correct_or_not.grid(row=4, column=1, sticky="nsew")
 
-            self.give_up = ttk.Button(self, text="Give Up", command=go_next)
+            self.next_eq = ttk.Button(self, text="Next eq", command=next_eq)
 
-            self.next_eq = ttk.Button(self, text="Next", command=go_next)
+            self.give_up = ttk.Button(self, text="Go Back", command=go_next)
+            self.give_up.grid(row=6, column=1, sticky='nsew')
+
+
             
           
         def forget_buttons():
+            self.range = self.entry.get()
             self.label_entry.grid_forget()
             self.entry.grid_forget()
-            self.entry_button.grid_forget()
+            # self.entry_button.grid_forget()
             self.start_button.grid_forget()
             start_math()
 
@@ -150,19 +175,23 @@ class RandEqPage(ttk.Frame):
         self.columnconfigure((0,1), weight=1)
         self.rowconfigure((0,1,2,3,4,5,6), weight=1)
 
+        self.range = ''
+
         label = ttk.Label(self, text="Second Page", font=("Arial", 14))
         label.grid(row=0, column=0, sticky="nsew")
 
         vcmd = (self.register(only_numbers), "%S")  # "%S" gets the typed character
-        self.number_of_range = self.q.qsize() + 1
-        self.label_entry = ttk.Label(self, text=f"{self.number_of_range}st range", font=("Arial", 10))
+        # self.number_of_range = self.q.qsize() + 1
+        # self.label_entry = ttk.Label(self, text=f"{self.number_of_range}st range", font=("Arial", 10))
+        self.label_entry = ttk.Label(self, text="select a range in the form of: x-x. Example: 1-100", font=("Arial", 10))
+
         self.label_entry.grid(row=1, column=0, sticky="nsew")
 
         self.entry = ttk.Entry(self, validate="key", validatecommand=vcmd)
         self.entry.grid(column=0, row=2, sticky="nsew")
 
-        self.entry_button = ttk.Button(self, text="range", command=self.get_range)
-        self.entry_button.grid(row=3, column=0, sticky="nsew")
+        # self.entry_button = ttk.Button(self, text="range", command=self.get_range)
+        # self.entry_button.grid(row=3, column=0, sticky="nsew")
 
         self.start_button = ttk.Button(self, text="Start", command=forget_buttons)
         self.start_button.grid(row=4, column=0, sticky="nsew")
@@ -173,6 +202,7 @@ class RandEqPage(ttk.Frame):
         button.grid(row=6, column=0, sticky="nsew")
 
     def get_range(self):
+            # this function is patched, WE dont like it
             #we need to use que
             text = self.entry.get()
             #left, right = text.split("-")
@@ -184,8 +214,8 @@ class RandEqPage(ttk.Frame):
 
     def math_maker(self):
         l = []
-        for i in range(self.q.qsize()):
-            x, y = self.q.get().split("-")
+        for i in range(2):
+            x, y = self.entry.get().split("-")
             new = random.randint(int(x), int(y))
             l.append(new)
         return l
@@ -344,50 +374,56 @@ class Calc(ttk.Frame):
 class GraphingCalc(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
-        conn = sq.connect('graph_data.db')
-        cursor = conn.cursor()
+        self.equations = []
+        # conn = sq.connect('graph_data.db')
+        # cursor = conn.cursor()
         self.columnconfigure((0,1,2,3,4,5), weight=1)
         self.rowconfigure((0,1), weight=1)
 
         def graph(row):
-            row = row[0].replace(" ", "")
-            y=np.linspace(-10,10,100)
-            x = np.linspace(-10, 10, 100)
-            if row.startswith("y"):
-                eq = row[2:]
-                #x = np.linspace(-10, 10, 100)
-                try:
-                    y = eval(eq, {"x": x, "np": np})
-                    if np.isscalar(y):
-                        y = np.full_like(x, y)
-                except:
-                    y = np.full_like(x, float(eq))
-                plt.plot(x, y)
-            elif row.startswith("x"):
-                eq = row[2:]
-                #y=np.linspace(-10,10,100)
-                try:
-                    x = eval(eq, {"y": y, "np": np})
-                    if np.isscalar(x):
-                        x = np.full_like(y, x)
-                except:
-                    x=np.full_like(y, float(eq))
-                y = np.clip(y, -1000, 1000)
-                
-                plt.plot(x,y)
+            row = row.replace(" ", "")
+
+            from sympy import symbols, lambdify
+            from sympy.parsing.sympy_parser import (
+                parse_expr,
+                standard_transformations,
+                implicit_multiplication_application
+            )
+
+            x = symbols('x')
+            transformations = standard_transformations + (implicit_multiplication_application,)
+
+            try:
+                if row.startswith("y="):
+                    eq = row[2:]
+
+                    expr = parse_expr(eq, transformations=transformations)
+
+                    f = lambdify(x, expr, "numpy")
+
+                    x_vals = np.linspace(-100, 100, 400)
+                    y_vals = f(x_vals)
+
+                    plt.plot(x_vals, y_vals, label=row)
+
+                else:
+                    print(f"Invalid format: {row} (use y=...)")
+
+            except Exception as e:
+                print(f"Error in '{row}':", e)
                 
 
         def graph_eq():
-            cursor.execute("Select expression from graph;")
-            rows = cursor.fetchall()
-
+            # cursor.execute("Select expression from graph;")
+            # rows = cursor.fetchall()
+            rows = self.equations
             for row in rows:
                 graph(row)
             
             plt.xlabel("x")
             plt.ylabel("y")
-            plt.ylim(-10, 10)
-            plt.xlim(-10, 10)
+            plt.ylim(-15, 15)
+            plt.xlim(-15, 15)
             plt.grid(True)
             plt.show()
 
@@ -395,16 +431,18 @@ class GraphingCalc(ttk.Frame):
             eq = entry_graph.get()
             eq_list.insert(tk.END, eq)
             entry_graph.delete(0, tk.END)
-            cursor.execute("insert into graph (expression) values (?)", (eq,))
-            conn.commit()
+            # cursor.execute("insert into graph (expression) values (?)", (eq,))
+            # conn.commit()
+            self.equations.append(eq)
 
         def delete_eq():
             try:
                 selected_index = eq_list.curselection()[0] #gets the selected item index
                 eq_to_delete = eq_list.get(selected_index) 
                 eq_list.delete(selected_index)  
-                cursor.execute("DELETE FROM graph WHERE expression = ?", (eq_to_delete,))
-                conn.commit()
+                # cursor.execute("DELETE FROM graph WHERE expression = ?", (eq_to_delete,))
+                # conn.commit()
+                self.equations.remove(eq_to_delete)
             except IndexError:
                 print("No item selected")  # Handle if no item is selected
 
@@ -412,16 +450,17 @@ class GraphingCalc(ttk.Frame):
             eq_list.delete(0, tk.END)
             reset_table()
         def reset_table():
-            cursor.execute("DELETE FROM graph")  # remove all rows
-            conn.commit()
+            # cursor.execute("DELETE FROM graph")  # remove all rows
+            # conn.commit()
+            self.equations = []
 
-        cursor.execute("""
-        Create table if not exists graph(
-            id integer primary key,
-            expression text 
-        )
-        """)
-        conn.commit()
+        # cursor.execute("""
+        # Create table if not exists graph(
+        #     id integer primary key,
+        #     expression text 
+        # )
+        # """)
+        # conn.commit()
 
         entry_graph = ttk.Entry(self)
         entry_graph.grid(row=0, column=0)
